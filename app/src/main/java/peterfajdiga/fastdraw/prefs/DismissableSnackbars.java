@@ -26,6 +26,10 @@ public class DismissableSnackbars {
         snackbar.show();
     }
 
+    public static boolean hasDismissals(@NonNull final Context context) {
+        return !getPrefs(context).getAll().isEmpty();
+    }
+
     public static void clearDismissals(@NonNull final Context context) {
         getPrefs(context).edit().clear().apply();
     }

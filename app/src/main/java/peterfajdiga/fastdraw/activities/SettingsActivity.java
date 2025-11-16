@@ -173,11 +173,19 @@ public class SettingsActivity extends AppCompatPreferenceActivity implements Sha
             super.onCreate(savedInstanceState);
             addPreferencesFromResource(R.xml.pref_general);
             setHasOptionsMenu(false);
+        }
 
-            findPreference("clearDontShowAgain").setOnPreferenceClickListener(preference -> {
-                DismissableSnackbars.clearDismissals(getContext());
-                return true;
-            });
+        @Override
+        public void onResume() {
+            super.onResume();
+            final Context context = getContext();
+            if (DismissableSnackbars.hasDismissals(context)) {
+                addPreferencesFromResource(R.xml.pref_dont_show_again);
+                findPreference("clearDontShowAgain").setOnPreferenceClickListener(preference -> {
+                    DismissableSnackbars.clearDismissals(context);
+                    return true;
+                });
+            }
         }
     }
 
