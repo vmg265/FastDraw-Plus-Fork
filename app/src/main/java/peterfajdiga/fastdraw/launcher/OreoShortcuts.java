@@ -38,45 +38,32 @@ public class OreoShortcuts {
     }
 
     @Nullable
-    public static List<ShortcutInfo> getPinnedShortcuts(@NonNull final Context context) {
+    public static List<ShortcutInfo> getPinnedShortcuts(@NonNull final Context context) throws UserLockedException, HostPermissionException {
         final LauncherApps launcherApps = (LauncherApps)context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
         final UserManager userManager = (UserManager)context.getSystemService(Context.USER_SERVICE);
-        try {
-            final UserHandle userHandle = getRunningUserHandle(launcherApps, userManager);
-            return getPinnedShortcuts(launcherApps, userHandle);
-        } catch (final IllegalStateException e) {
-            handleLauncherAppsException(context, e);
-        } catch (final SecurityException e) {
-            handleLauncherAppsException(context, e);
-        }
-        return null;
+        final UserHandle userHandle = getRunningUserHandle(launcherApps, userManager);
+        return getPinnedShortcuts(launcherApps, userHandle);
     }
 
     public static void unpinShortcut(
         @NonNull final Context context,
         @NonNull final String shortcutPackage,
         @NonNull final String shortcutId
-    ) {
+    ) throws UserLockedException, HostPermissionException {
         final LauncherApps launcherApps = (LauncherApps)context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
         final UserManager userManager = (UserManager)context.getSystemService(Context.USER_SERVICE);
-        try {
-            final UserHandle userHandle = getRunningUserHandle(launcherApps, userManager);
-            unpinShortcut(launcherApps, userHandle, shortcutPackage, shortcutId);
-        } catch (final IllegalStateException e) {
-            handleLauncherAppsException(context, e);
-        } catch (final SecurityException e) {
-            handleLauncherAppsException(context, e);
-        }
+        final UserHandle userHandle = getRunningUserHandle(launcherApps, userManager);
+        unpinShortcut(launcherApps, userHandle, shortcutPackage, shortcutId);
     }
 
     @Nullable
     private static List<ShortcutInfo> getPinnedShortcuts(
         @NonNull final LauncherApps launcherApps,
         @NonNull final UserHandle user
-    ) throws IllegalStateException, SecurityException {
+    ) throws UserLockedException, HostPermissionException {
         final LauncherApps.ShortcutQuery query = new LauncherApps.ShortcutQuery();
         query.setQueryFlags(FLAG_MATCH_PINNED);
-        return launcherApps.getShortcuts(query, user);
+        return getShortcuts(launcherApps, user, query);
     }
 
     @Nullable
@@ -84,11 +71,11 @@ public class OreoShortcuts {
         @NonNull final LauncherApps launcherApps,
         @NonNull final UserHandle user,
         @NonNull final String packageName
-    ) throws IllegalStateException, SecurityException {
+    ) throws UserLockedException, HostPermissionException {
         final LauncherApps.ShortcutQuery query = new LauncherApps.ShortcutQuery();
         query.setQueryFlags(FLAG_MATCH_PINNED);
         query.setPackage(packageName);
-        return launcherApps.getShortcuts(query, user);
+        return getShortcuts(launcherApps, user, query);
     }
 
     private static void unpinShortcut(
@@ -96,7 +83,7 @@ public class OreoShortcuts {
         @NonNull final UserHandle user,
         @NonNull final String shortcutPackage,
         @NonNull final String shortcutId
-    ) throws IllegalStateException, SecurityException {
+    ) throws UserLockedException, HostPermissionException {
         final List<ShortcutInfo> pinnedShortcuts = getPinnedShortcuts(launcherApps, user, shortcutPackage);
         if (pinnedShortcuts == null) {
             Log.w("OreoShortcuts", String.format("Shortcut %s of package %s is not pinned", shortcutId, shortcutPackage));
@@ -108,35 +95,60 @@ public class OreoShortcuts {
             filter(id -> !id.equals(shortcutId)).
             collect(Collectors.toList());
 
-        launcherApps.pinShortcuts(shortcutPackage, newPinnedShortcutIds, user);
+        pinShortcuts(launcherApps, user, shortcutPackage, newPinnedShortcutIds);
     }
 
     @NonNull
     private static UserHandle getRunningUserHandle(
         @NonNull final LauncherApps launcherApps,
         @NonNull final UserManager userManager
-    ) throws IllegalStateException {
+    ) throws UserLockedException {
         for (final UserHandle user : launcherApps.getProfiles()) {
             if (userManager.isUserRunning(user) && userManager.isUserUnlocked(user)) {
                 return user;
             }
         }
-        throw new IllegalStateException("no unlocked running user");
+        throw new UserLockedException(null);
     }
 
-    private static void handleLauncherAppsException(
-        @NonNull final Context context,
-        @NonNull final IllegalStateException e
-    ) {
-        Log.e("OreoShortcuts", "User is locked or not running (IllegalStateException)", e);
-        Toast.makeText(context, R.string.error_oreo_user_handle, Toast.LENGTH_LONG).show();
+    private static List<ShortcutInfo> getShortcuts(
+        @NonNull final LauncherApps launcherApps,
+        @NonNull final UserHandle user,
+        @NonNull final LauncherApps.ShortcutQuery query
+    ) throws UserLockedException, HostPermissionException {
+        try {
+            return launcherApps.getShortcuts(query, user);
+        } catch (final IllegalStateException e) {
+            throw new UserLockedException(e);
+        } catch (final SecurityException e) {
+            throw new HostPermissionException(e);
+        }
     }
 
-    private static void handleLauncherAppsException(
-        @NonNull final Context context,
-        @NonNull final SecurityException e
-    ) {
-        Log.e("OreoShortcuts", "Can't access shortcuts (SecurityException)", e);
-        Toast.makeText(context, R.string.error_oreo_shortcuts_security, Toast.LENGTH_LONG).show();
+    private static void pinShortcuts(
+        @NonNull final LauncherApps launcherApps,
+        @NonNull final UserHandle user,
+        @NonNull final String shortcutPackage,
+        @NonNull List<String> newPinnedShortcutIds
+    ) throws UserLockedException, HostPermissionException {
+        try {
+            launcherApps.pinShortcuts(shortcutPackage, newPinnedShortcutIds, user);
+        } catch (final IllegalStateException e) {
+            throw new UserLockedException(e);
+        } catch (final SecurityException e) {
+            throw new HostPermissionException(e);
+        }
+    }
+
+    public static class UserLockedException extends Exception {
+        public UserLockedException(@Nullable final IllegalStateException cause) {
+            super("User is locked or not running", cause);
+        }
+    }
+
+    public static class HostPermissionException extends Exception {
+        public HostPermissionException(@Nullable final SecurityException cause) {
+            super("Missing shortcut host permission", cause);
+        }
     }
 }

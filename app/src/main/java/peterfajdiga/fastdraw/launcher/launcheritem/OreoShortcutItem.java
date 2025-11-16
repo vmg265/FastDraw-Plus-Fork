@@ -53,7 +53,7 @@ public class OreoShortcutItem implements ShortcutItem {
     }
 
     @Override
-    public void delete(final Context context) {
+    public void delete(final Context context) throws OreoShortcuts.UserLockedException, OreoShortcuts.HostPermissionException {
         OreoShortcuts.unpinShortcut(context, info.getPackage(), info.getId());
     }
 }

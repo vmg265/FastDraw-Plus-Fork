@@ -32,14 +32,7 @@ import peterfajdiga.fastdraw.launcher.launcheritem.Saveable;
 public class ShortcutItemManager {
     private ShortcutItemManager() {}
 
-    @NonNull
-    public static Stream<LauncherItem> getShortcutItems(@NonNull final Context context) {
-        final Stream<LauncherItem> filedShortcuts = getFiledShortcutItems(context);
-        final Stream<LauncherItem> oreoShortcuts = getOreoShortcutItems(context);
-        return Stream.concat(filedShortcuts, oreoShortcuts);
-    }
-
-    private static Stream<LauncherItem> getFiledShortcutItems(@NonNull final Context context) {
+    public static Stream<LauncherItem> getFiledShortcutItems(@NonNull final Context context) {
         final File shortcutsDir = getShortcutsDir(context);
         shortcutsDir.mkdir();
         return Arrays.stream(shortcutsDir.listFiles()).map(file -> {
@@ -56,7 +49,7 @@ public class ShortcutItemManager {
     }
 
     @NonNull
-    private static Stream<LauncherItem> getOreoShortcutItems(@NonNull final Context context) {
+    public static Stream<LauncherItem> getOreoShortcutItems(@NonNull final Context context) throws OreoShortcuts.UserLockedException, OreoShortcuts.HostPermissionException {
         final List<ShortcutInfo> shortcuts = OreoShortcuts.getPinnedShortcuts(context);
         if (shortcuts == null) {
             return Stream.empty();

@@ -74,6 +74,7 @@ import peterfajdiga.fastdraw.launcher.AppItemManager;
 import peterfajdiga.fastdraw.launcher.DropZone;
 import peterfajdiga.fastdraw.launcher.LaunchManager;
 import peterfajdiga.fastdraw.launcher.Launcher;
+import peterfajdiga.fastdraw.launcher.OreoShortcuts;
 import peterfajdiga.fastdraw.launcher.ShortcutItemManager;
 import peterfajdiga.fastdraw.launcher.launcheritem.AppItem;
 import peterfajdiga.fastdraw.launcher.launcheritem.BitmapShortcutItem;
@@ -522,7 +523,13 @@ public class MainActivity extends FragmentActivity implements CategorySelectionD
             (draggedItem) -> {
                 final ShortcutItem shortcutItem = (ShortcutItem)draggedItem;
                 launcher.removeItem(shortcutItem, true);
-                shortcutItem.delete(this);
+                try {
+                    shortcutItem.delete(this);
+                } catch (OreoShortcuts.UserLockedException e) {
+                    handleOreoShortcutsUserLockedException(e);
+                } catch (OreoShortcuts.HostPermissionException e) {
+                    handleOreoShortcutsHostPermissionException(e);
+                }
             },
             true
         ));
@@ -797,12 +804,39 @@ public class MainActivity extends FragmentActivity implements CategorySelectionD
     }
 
     private void loadLauncherItems() {
-        final LauncherItem[] items = Stream.concat(
+        final LauncherItem[] items = Stream.of(
             AppItemManager.getAppItems(getPackageManager()),
-            ShortcutItemManager.getShortcutItems(this)
-        ).toArray(LauncherItem[]::new);
+            ShortcutItemManager.getFiledShortcutItems(this),
+            getOreoShortcutItems()
+        ).flatMap(s -> s).toArray(LauncherItem[]::new);
 
         launcher.addItemsStartup(items);
+    }
+
+    private Stream<LauncherItem> getOreoShortcutItems() {
+        try {
+            return ShortcutItemManager.getOreoShortcutItems(this);
+        } catch (OreoShortcuts.UserLockedException e) {
+            handleOreoShortcutsUserLockedException(e);
+            return Stream.empty();
+        } catch (OreoShortcuts.HostPermissionException e) {
+            handleOreoShortcutsHostPermissionException(e);
+            return Stream.empty();
+        }
+    }
+
+    private void handleOreoShortcutsUserLockedException(
+        @NonNull final OreoShortcuts.UserLockedException e
+    ) {
+        Log.e("OreoShortcuts", "User is locked or not running (IllegalStateException)", e);
+        Toast.makeText(this, R.string.error_oreo_user_handle, Toast.LENGTH_LONG).show();
+    }
+
+    private void handleOreoShortcutsHostPermissionException(
+        @NonNull final OreoShortcuts.HostPermissionException e
+    ) {
+        Log.e("OreoShortcuts", "Can't access shortcuts (SecurityException)", e);
+        Toast.makeText(this, R.string.error_oreo_shortcuts_security, Toast.LENGTH_LONG).show();
     }
 
     /**
